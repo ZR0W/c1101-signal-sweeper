@@ -91,7 +91,7 @@ def main():
     check("RSSI line format RSSI,<f.3>,<peak>,<avg>,<n>", bool(m), rssi[0] if rssi else "")
     n50 = 0
     if m:
-        f, peak, avg, n50 = float(m[1]), int(m[2]), int(m[3]), int(m[4])
+        peak, avg, n50 = int(m[2]), int(m[3]), int(m[4])
         check("frequency echoed as 315.000", m[1] == "315.000", m[1])
         check("peak >= avg, both in -128..0 dBm", -128 <= avg <= peak <= 0, f"peak {peak} avg {avg}")
         check("samples > 10 for 50 ms", n50 > 10, str(n50))
