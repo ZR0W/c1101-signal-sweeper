@@ -16,6 +16,8 @@ dashboard.py                  Flask app; reads rfscan.db only
 templates/index.html          the dashboard page (Plotly)
 presets.json                  named sweep ranges (keyfob, survey_915, survey_433)
 tools/fake_board.py           simulated board for trying things without hardware
+tools/firmware_check.py       PASS/FAIL check of the flashed firmware over USB
+docs/LOCAL_AGENT_TESTING.md   step-by-step hardware test plan (for a local agent or a person)
 rfscan.db                     created at runtime (git-ignored)
 ```
 
@@ -76,6 +78,8 @@ test if you need it.
    usage line instead. The existing commands (`scan`, `listen`, `rssi`,
    `bands`, `?`) work exactly as before.
 5. **Close the Serial Monitor** so the collector can open the port.
+6. Optional but thorough: `python tools/firmware_check.py` runs 27 automated
+   checks covering `probe` and every existing command.
 
 ## 3. Python setup
 
@@ -118,7 +122,7 @@ a job.
 |---|---|
 | `sweep START END STEP_KHZ [DWELL_MS]` | one pass, a live line per step, logged as label `sweep` |
 | `sweep PRESET` | one pass of a preset, logged under the preset's name |
-| `watch PRESET` | loop a preset forever; the main data-gathering mode for the waterfall |
+| `watch PRESET [SECONDS]` | loop a preset (forever, or for SECONDS); the main data-gathering mode for the waterfall |
 | `monitor MHZ [DWELL_MS]` | probe one frequency repeatedly (label `monitor`) |
 | `presets` / `addpreset NAME START END STEP_KHZ [DWELL_MS]` / `rmpreset NAME` | manage `presets.json` |
 | `export [CSV_PATH] [LAST_MINUTES] [LABEL]` | dump readings to CSV (default `rfscan_export.csv`) |
@@ -134,7 +138,7 @@ Seeded presets:
 
 Commands can also be scripted: `python collector.py -c "watch keyfob"`, or pipe
 commands into stdin. In piped mode, each job runs to completion before the next
-line is read.
+line is read, so give `watch` a duration there (`watch keyfob 60`).
 
 Each reading is one row in `rfscan.db` (`readings` table: `ts`, `freq_mhz`,
 `rssi_peak`, `rssi_avg`, `samples`, `sweep_label`). The database uses WAL

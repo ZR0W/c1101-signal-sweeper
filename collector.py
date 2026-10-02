@@ -281,7 +281,7 @@ def save_presets(path: Path, presets: dict) -> None:
 HELP = """\
 sweep START END STEP_KHZ [DWELL_MS]   one pass, probe each step, log it (label "sweep")
 sweep PRESET                         one pass of a preset (label = preset name)
-watch PRESET                         loop that preset forever (Enter or 'stop' ends it)
+watch PRESET [SECONDS]               loop that preset (forever, or SECONDS); Enter or 'stop' ends it
 monitor MHZ [DWELL_MS]               probe one frequency repeatedly (label "monitor")
 presets                              list presets
 addpreset NAME START END STEP_KHZ [DWELL_MS]
@@ -365,9 +365,10 @@ class Collector:
             print(f"{len(rows)} readings logged as '{label}'. "
                   f"Strongest: {best['freq']:.4f} MHz at {best['peak']} dBm")
 
-    def do_watch(self, name, freqs, dwell):
+    def do_watch(self, name, freqs, dwell, seconds=None):
         ramp = " .:-=+*#%@"
-        while not self.stop_evt.is_set():
+        end = time.time() + seconds if seconds else None
+        while not self.stop_evt.is_set() and (end is None or time.time() < end):
             t0 = time.time()
             rows = self._sweep_once(freqs, dwell, name, verbose=False)
             if not rows:
@@ -462,8 +463,10 @@ class Collector:
         elif cmd == "watch":
             pf = self.preset_freqs(a[0])
             if pf:
-                print(f"Watching '{a[0]}': {len(pf[0])} steps x {pf[1]} ms. Enter stops.")
-                self.start_job(f"watch {a[0]}", self.do_watch, a[0], pf[0], pf[1])
+                secs = float(a[1]) if len(a) > 1 else None
+                limit = f" for {secs:g} s" if secs else ""
+                print(f"Watching '{a[0]}'{limit}: {len(pf[0])} steps x {pf[1]} ms. Enter stops.")
+                self.start_job(f"watch {a[0]}", self.do_watch, a[0], pf[0], pf[1], secs)
         elif cmd == "monitor":
             freq = float(a[0])
             dwell = int(a[1]) if len(a) > 1 else DEFAULT_DWELL_MS
