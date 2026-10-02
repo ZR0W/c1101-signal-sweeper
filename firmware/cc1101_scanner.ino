@@ -19,6 +19,8 @@
     listen 433.92 -80      ...with a manual trigger level
     rssi 433.92            live signal-strength meter
     bands                  list presets          ?   help
+    probe 315.0 50         one machine-readable reading for collector.py:
+                           RSSI,<freq_mhz>,<peak_dbm>,<avg_dbm>,<samples>
 
   Receive only: this sketch never transmits.
 */
@@ -340,6 +342,30 @@ void rssiMeter(float mhz) {
   Serial.println(F("Stopped."));
 }
 
+// ---------------------------------------------------------------- probe
+
+// One reading for the PC collector. Prints exactly one line:
+//   RSSI,<freq_mhz>,<peak_dbm>,<avg_dbm>,<samples>
+void probe(float mhz, uint32_t dwellMs) {
+  ELECHOUSE_cc1101.setModulation(2);
+  ELECHOUSE_cc1101.setRxBW(101.56);
+  ELECHOUSE_cc1101.SetRx(mhz);
+  delay(2);                               // PLL calibration + RSSI settling
+  int peak = -128;
+  long sum = 0;
+  int samples = 0;
+  uint32_t t0 = millis();
+  do {
+    int r = ELECHOUSE_cc1101.getRssi();
+    if (r > peak) peak = r;
+    sum += r;
+    samples++;
+    delayMicroseconds(300);
+  } while (millis() - t0 < dwellMs);
+  ELECHOUSE_cc1101.setSidle();
+  Serial.printf("RSSI,%.3f,%d,%d,%d\n", mhz, peak, (int)lround((double)sum / samples), samples);
+}
+
 // ---------------------------------------------------------------- commands
 
 void printHelp() {
@@ -347,6 +373,7 @@ void printHelp() {
   Serial.println(F("scan START END [stepKHz] [seconds]       custom sweep (MHz)"));
   Serial.println(F("listen MHZ [fsk] [-dBm]                  capture bursts (optional trigger)"));
   Serial.println(F("rssi MHZ                                 live signal-strength meter"));
+  Serial.println(F("probe MHZ [dwell ms]                     one RSSI,... line (for collector.py)"));
   Serial.println(F("bands   ?    (send any key to stop a scan or listen)"));
 }
 
@@ -383,6 +410,17 @@ void handleCommand(String line) {
     float f = atof(arg.c_str());
     if (!validFreq(f)) { Serial.println(F("Usage: rssi 433.92")); return; }
     rssiMeter(f);
+  } else if (cmd == "probe" || cmd == "probe?") {
+    float f = 0;
+    long ms = 50;
+    arg.trim();
+    int n = sscanf(arg.c_str(), "%f %ld", &f, &ms);
+    bool badDwell = arg.indexOf(' ') >= 0 && n < 2;
+    if (cmd == "probe?" || n < 1 || badDwell || !validFreq(f) || ms < 1 || ms > 10000) {
+      Serial.println(F("Usage: probe 315.0 [dwell ms, 1-10000, default 50]"));
+      return;
+    }
+    probe(f, (uint32_t)ms);
   } else if (cmd == "bands") {
     for (const Band &bd : kBands) Serial.printf("  %s: %.1f-%.1f MHz\n", bd.name, bd.start, bd.end);
   } else if (cmd == "?" || cmd == "help") {
