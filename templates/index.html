@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RF Scanner</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Cpath d=%27M1 12h2V8h2v6h2V3h2v9h2V6h2v5h2%27 fill=%27none%27 stroke=%27%232a78d6%27 stroke-width=%271.6%27/%3E%3C/svg%3E">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script>window.Plotly || document.write('<script src="/plotly.min.js"><\/script>')</script>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f3f0;
+    --surface-1: #fcfcfb;
+    --border: #e2e1dc;
+    --grid: #ecebe7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #7a7974;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --accent-bg: #e8f1fc;
+    --seq: #cde2fb,#9ec5f4,#6da7ec,#3987e5,#256abf,#184f95,#0d366b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-0: #111110;
+      --surface-1: #1a1a19;
+      --border: #2e2e2b;
+      --grid: #262624;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #8f8e86;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --accent-bg: #1c2a3c;
+      --seq: #14243a,#104281,#184f95,#256abf,#3987e5,#6da7ec,#cde2fb;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #111110;
+    --surface-1: #1a1a19;
+    --border: #2e2e2b;
+    --grid: #262624;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --accent-bg: #1c2a3c;
+    --seq: #14243a,#104281,#184f95,#256abf,#3987e5,#6da7ec,#cde2fb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--surface-0); color: var(--text-primary);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center;
+    padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface-1);
+  }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  .muted { color: var(--text-muted); }
+  .secondary { color: var(--text-secondary); }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-left: auto; }
+  label.ctl { display: flex; gap: 6px; align-items: center; color: var(--text-secondary); font-size: 13px; }
+  select, button {
+    font: inherit; font-size: 13px; color: var(--text-primary); background: var(--surface-0);
+    border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px;
+  }
+  button { cursor: pointer; }
+  #status { font-size: 13px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px;
+         background: var(--text-muted); vertical-align: 1px; }
+  .dot.live { background: #0ca30c; }
+  main {
+    display: grid; gap: 12px; padding: 12px 16px;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    grid-template-areas: "wf spec" "wf act" "hist act";
+  }
+  @media (max-width: 900px) {
+    main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "spec" "wf" "act" "hist"; }
+  }
+  .panel {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; min-width: 0; position: relative;
+  }
+  .panel h2 { font-size: 14px; margin: 0 0 2px; font-weight: 600; }
+  .panel .sub { font-size: 12px; color: var(--text-muted); margin: 0 0 6px; min-height: 1.4em; }
+  #p-wf { grid-area: wf; } #p-spec { grid-area: spec; } #p-act { grid-area: act; } #p-hist { grid-area: hist; }
+  #wf { height: 520px; } #spec { height: 250px; } #hist { height: 240px; }
+  .empty {
+    position: absolute; inset: 44px 14px 14px; display: none; align-items: center; justify-content: center;
+    text-align: center; color: var(--text-muted); font-size: 13px; background: var(--surface-1);
+  }
+  .empty.show { display: flex; }
+  code { font-size: 12px; background: var(--surface-0); padding: 1px 5px; border-radius: 4px; }
+  .tablewrap { max-height: 560px; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-weight: 600; color: var(--text-secondary); position: sticky; top: 0;
+       background: var(--surface-1); border-bottom: 1px solid var(--border); padding: 6px; }
+  td { padding: 5px 6px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  td.num, th.num { text-align: right; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover, tbody tr.sel { background: var(--accent-bg); }
+</style>
+</head>
+<body>
+<header>
+  <h1>RF Scanner <span class="muted" style="font-weight:400">· receive only</span></h1>
+  <span id="status" class="secondary"><span class="dot"></span>connecting…</span>
+  <div class="controls">
+    <label class="ctl">Sweep
+      <select id="label"><option value="">latest</option></select>
+    </label>
+    <label class="ctl">Window
+      <select id="minutes">
+        <option value="5">5 min</option><option value="15">15 min</option>
+        <option value="30" selected>30 min</option><option value="60">1 h</option>
+        <option value="180">3 h</option><option value="720">12 h</option><option value="1440">24 h</option>
+      </select>
+    </label>
+    <button id="pause" type="button">Pause</button>
+  </div>
+</header>
+
+<main>
+  <section class="panel" id="p-wf">
+    <h2>Waterfall</h2>
+    <p class="sub" id="wf-sub">Peak dBm per sweep. A key fob press shows up as a short bright stripe.</p>
+    <div id="wf"></div>
+    <div class="empty" id="wf-empty"></div>
+  </section>
+
+  <section class="panel" id="p-spec">
+    <h2>Spectrum</h2>
+    <p class="sub" id="spec-sub"></p>
+    <div id="spec"></div>
+    <div class="empty" id="spec-empty"></div>
+  </section>
+
+  <section class="panel" id="p-act">
+    <h2>Activity</h2>
+    <p class="sub">Signals ≥ {{ margin_db }} dB above the noise floor (median peak in the window), newest first. Neighbouring bins from one transmission are merged. Click a row for its history.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Time</th><th>Sweep</th><th class="num">MHz</th><th class="num">Peak</th><th class="num">Above floor</th><th class="num">Span</th></tr></thead>
+        <tbody id="act-body"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="act-empty"></div>
+  </section>
+
+  <section class="panel" id="p-hist">
+    <h2 id="hist-title">Frequency history</h2>
+    <p class="sub" id="hist-sub">Click the spectrum, the waterfall or an activity row.</p>
+    <div id="hist"></div>
+    <div class="empty" id="hist-empty"></div>
+  </section>
+</main>
+
+<script>
+const POLL_MS = 4000;
+const state = { label: "", minutes: 30, paused: false, freq: null, histLabel: null, shownLabel: null, timer: null };
+const $ = (id) => document.getElementById(id);
+const WAITING = 'Waiting for data. Start the collector: <code>python collector.py</code> then <code>watch keyfob</code>';
+
+function tok(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function baseLayout(extra) {
+  const grid = tok("--grid"), muted = tok("--text-muted");
+  const axis = { gridcolor: grid, zerolinecolor: grid, linecolor: tok("--border"),
+                 tickfont: { color: muted, size: 11 }, title: { font: { color: tok("--text-secondary"), size: 12 } } };
+  return Object.assign({
+    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
+    font: { family: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif", color: tok("--text-secondary") },
+    margin: { l: 56, r: 12, t: 8, b: 40 },
+    xaxis: Object.assign({}, axis), yaxis: Object.assign({}, axis),
+    hoverlabel: { bgcolor: tok("--surface-1"), bordercolor: tok("--border"), font: { color: tok("--text-primary") } },
+    showlegend: false, uirevision: "keep",
+  }, extra || {});
+}
+// Click-to-inspect on the spectrum/waterfall. Plotly.react keeps handlers; purge drops them.
+function bindClick(id) {
+  const el = $(id);
+  if (!el.on || el._rfBound) return;
+  el.on("plotly_click", (ev) => {
+    const pt = ev.points && ev.points[0];
+    if (pt) selectFreq(+pt.x, state.shownLabel);
+  });
+  el._rfBound = true;
+}
+function purge(id) { Plotly.purge(id); $(id)._rfBound = false; }
+const CONFIG = { responsive: true, displaylogo: false, modeBarButtonsToRemove: ["lasso2d", "select2d"] };
+
+function setEmpty(id, html) { const el = $(id); el.innerHTML = html || ""; el.classList.toggle("show", !!html); }
+
+function q(path, params) {
+  const u = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== null && v !== undefined && v !== "") u.set(k, v);
+  return fetch(path + "?" + u).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+}
+
+// ---------------------------------------------------------------- panels
+
+function drawSpectrum(rows, info) {
+  if (!rows.length) { setEmpty("spec-empty", WAITING); purge("spec"); $("spec-sub").textContent = ""; return; }
+  setEmpty("spec-empty");
+  const thr = info.threshold;
+  const hi = rows.filter((r) => thr !== null && r.peak >= thr), lo = rows.filter((r) => !(thr !== null && r.peak >= thr));
+  const floorY = -120;                  // bars grow up from below the weakest reading
+  const hover = "%{x:.4f} MHz<br>peak %{customdata[0]} dBm<br>avg %{customdata[1]} dBm<extra></extra>";
+  const bars = (set, color, name) => ({
+    type: "bar", name, x: set.map((r) => r.freq), y: set.map((r) => r.peak - floorY), base: floorY,
+    customdata: set.map((r) => [r.peak, r.avg]), hovertemplate: hover,
+    marker: { color, line: { width: 0 } },
+  });
+  const minF = rows[0].freq, maxF = rows[rows.length - 1].freq;
+  const traces = [bars(lo, tok("--series-1"), "below threshold"), bars(hi, tok("--series-2"), "above threshold")];
+  const shapes = thr === null ? [] : [{ type: "line", xref: "paper", x0: 0, x1: 1, y0: thr, y1: thr,
+    line: { color: tok("--text-secondary"), width: 1, dash: "dash" } }];
+  const annotations = thr === null ? [] : [{ xref: "paper", x: 1, y: thr, yanchor: "bottom", xanchor: "right",
+    text: `activity ≥ ${thr.toFixed(0)} dBm`, showarrow: false, font: { size: 11, color: tok("--text-secondary") } }];
+  const maxPeak = Math.max(...rows.map((r) => r.peak));
+  Plotly.react("spec", traces, baseLayout({
+    bargap: rows.length > 60 ? 0.05 : 0.15, shapes, annotations, showlegend: hi.length > 0,
+    legend: { orientation: "h", x: 0, y: 1.12, font: { size: 11 } },
+    xaxis: Object.assign(baseLayout().xaxis, { title: { text: "MHz" }, tickformat: ".3f",
+      range: minF === maxF ? [minF - 0.05, maxF + 0.05] : undefined }),
+    yaxis: Object.assign(baseLayout().yaxis, { title: { text: "peak dBm" },
+      range: [Math.min(-110, ...rows.map((r) => r.peak)) - 2, Math.max(-30, maxPeak + 5)] }),
+  }), CONFIG);
+  bindClick("spec");
+  const best = rows.reduce((a, b) => (b.peak > a.peak ? b : a));
+  $("spec-sub").textContent = `Latest pass, ${rows.length} steps. Strongest ${best.freq.toFixed(4)} MHz at ${best.peak} dBm` +
+    (info.noise_floor !== null ? `; noise floor ${info.noise_floor.toFixed(0)} dBm.` : ".");
+}
+
+function seqScale() {
+  const c = tok("--seq").split(",").map((s) => s.trim());
+  return c.map((col, i) => [i / (c.length - 1), col]);
+}
+
+function drawWaterfall(wf) {
+  if (!wf.times.length) { setEmpty("wf-empty", WAITING); purge("wf"); return; }
+  setEmpty("wf-empty");
+  const flat = wf.z.flat().filter((v) => v !== null);
+  const nf = wf.noise_floor ?? Math.min(...flat);
+  const zmin = Math.round(nf - 4), zmax = Math.max(Math.round(nf + 40), Math.max(...flat));
+  const trace = {
+    type: "heatmap", x: wf.freqs, y: wf.times, z: wf.z, zmin, zmax, colorscale: seqScale(),
+    hoverongaps: false, xgap: wf.freqs.length < 80 ? 1 : 0,
+    hovertemplate: "%{x:.4f} MHz<br>%{y}<br>peak %{z} dBm<extra></extra>",
+    colorbar: { title: { text: "dBm", side: "right", font: { size: 11 } }, thickness: 10, outlinewidth: 0,
+                tickfont: { size: 10, color: tok("--text-muted") } },
+  };
+  Plotly.react("wf", [trace], baseLayout({
+    margin: { l: 150, r: 8, t: 8, b: 40 },
+    xaxis: Object.assign(baseLayout().xaxis, { title: { text: "MHz" }, tickformat: ".3f" }),
+    yaxis: Object.assign(baseLayout().yaxis, { type: "date", autorange: "reversed", tickformat: "%H:%M:%S" }),
+  }), CONFIG);
+  bindClick("wf");
+  const merged = wf.passes_per_row > 1 ? ` (each row merges ${wf.passes_per_row} passes, max-hold)` : "";
+  $("wf-sub").textContent = `'${wf.label}': ${wf.passes} passes in the window${merged}, newest at the top. ` +
+    "A key fob press shows up as a short bright stripe.";
+}
+
+function drawActivity(rows) {
+  const body = $("act-body");
+  body.innerHTML = "";
+  if (!rows.length) { setEmpty("act-empty", "No activity above the threshold in this window yet."); return; }
+  setEmpty("act-empty");
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    tr.title = `${r.readings} reading(s), ${r.freq_lo.toFixed(4)}–${r.freq_hi.toFixed(4)} MHz, ${r.start.slice(11, 23)}–${r.end.slice(11, 23)}`;
+    if (state.freq !== null && Math.abs(r.freq - state.freq) < 0.0005) tr.classList.add("sel");
+    for (const [v, cls] of [[r.time.slice(11, 19), ""], [r.label, ""], [r.freq.toFixed(4), "num"],
+                            [`${r.peak} dBm`, "num"], [`+${r.above_db.toFixed(0)} dB`, "num"],
+                            [r.freq_hi > r.freq_lo ? `${Math.round((r.freq_hi - r.freq_lo) * 1000)} kHz` : "–", "num"]]) {
+      const td = document.createElement("td"); td.textContent = v; if (cls) td.className = cls; tr.appendChild(td);
+    }
+    tr.addEventListener("click", () => selectFreq(r.freq, r.label));
+    body.appendChild(tr);
+  }
+}
+
+function drawHistory(h) {
+  if (state.freq === null) { setEmpty("hist-empty", "Pick a frequency: click the spectrum, the waterfall or an activity row."); return; }
+  $("hist-title").textContent = `History at ${state.freq.toFixed(4)} MHz`;
+  if (!h.times.length) { setEmpty("hist-empty", "No readings at this frequency in the window."); purge("hist"); return; }
+  setEmpty("hist-empty");
+  const line = (y, color, name) => ({ type: "scatter", mode: h.times.length > 200 ? "lines" : "lines+markers",
+    name, x: h.times, y, line: { color, width: 2 }, marker: { size: 8, color, line: { width: 2, color: tok("--surface-1") } },
+    hovertemplate: `%{x|%H:%M:%S}<br>${name} %{y} dBm<extra></extra>` });
+  const shapes = h.threshold === null ? [] : [{ type: "line", xref: "paper", x0: 0, x1: 1, y0: h.threshold, y1: h.threshold,
+    line: { color: tok("--text-secondary"), width: 1, dash: "dash" } }];
+  Plotly.react("hist", [line(h.peak, tok("--series-1"), "peak"), line(h.avg, tok("--series-2"), "avg")], baseLayout({
+    showlegend: true, legend: { orientation: "h", x: 0, y: 1.15, font: { size: 11 } }, shapes,
+    hovermode: "x unified",
+    xaxis: Object.assign(baseLayout().xaxis, { type: "date", tickformat: "%H:%M:%S" }),
+    yaxis: Object.assign(baseLayout().yaxis, { title: { text: "dBm" } }),
+  }), CONFIG);
+  $("hist-sub").textContent = `${h.times.length} readings` + (h.label ? ` from '${h.label}'` : "") +
+    (h.threshold !== null ? `. Dashed line: activity threshold ${h.threshold.toFixed(0)} dBm.` : ".");
+}
+
+// ---------------------------------------------------------------- refresh loop
+
+function selectFreq(freq, label) {
+  state.freq = freq; state.histLabel = label || null;
+  refresh();
+}
+
+async function refresh() {
+  if (document.hidden) return;
+  const p = { label: state.label, minutes: state.minutes };
+  try {
+    const [sum, spec, wf, act] = await Promise.all([
+      q("/api/summary", p), q("/api/latest_sweep", p), q("/api/waterfall", p),
+      q("/api/activity", { minutes: state.minutes, limit: 50 }),
+    ]);
+    syncLabels(sum);
+    state.shownLabel = sum.label;
+    const info = { noise_floor: sum.noise_floor, threshold: sum.threshold };
+    drawSpectrum(spec, info);
+    drawWaterfall(wf);
+    drawActivity(act);
+    if (state.freq !== null) {
+      drawHistory(await q("/api/freq_history", { freq: state.freq, minutes: state.minutes, label: state.histLabel }));
+    } else drawHistory(null);
+    const live = sum.labels.length && Date.now() / 1000 - sum.labels[0].last_ts < 30;
+    $("status").innerHTML = `<span class="dot${live ? " live" : ""}"></span>` + (sum.total_rows
+      ? `${sum.total_rows.toLocaleString()} readings · last ${sum.labels[0].last.slice(11, 19)}${live ? "" : " (collector idle)"}`
+      : "no data yet");
+  } catch (e) {
+    $("status").innerHTML = '<span class="dot"></span>dashboard server unreachable';
+  }
+}
+
+function syncLabels(sum) {
+  const sel = $("label");
+  const want = ["", ...sum.labels.map((l) => l.label)];
+  const have = [...sel.options].map((o) => o.value);
+  if (want.join("\n") !== have.join("\n")) {
+    sel.innerHTML = "";
+    for (const v of want) {
+      const o = document.createElement("option");
+      const meta = sum.labels.find((l) => l.label === v);
+      o.value = v; o.textContent = v ? `${v} (${meta.fmin.toFixed(1)}–${meta.fmax.toFixed(1)} MHz)` : "latest";
+      sel.appendChild(o);
+    }
+    sel.value = state.label;
+  }
+  sel.options[0].textContent = sum.label ? `latest (${sum.label})` : "latest";
+}
+
+function schedule() {
+  clearInterval(state.timer);
+  if (!state.paused) state.timer = setInterval(refresh, POLL_MS);
+}
+
+$("label").addEventListener("change", (e) => { state.label = e.target.value; state.freq = null; refresh(); });
+$("minutes").addEventListener("change", (e) => { state.minutes = +e.target.value; refresh(); });
+$("pause").addEventListener("click", () => {
+  state.paused = !state.paused; $("pause").textContent = state.paused ? "Resume" : "Pause"; schedule();
+});
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", refresh);
+
+refresh();
+schedule();
+</script>
+</body>
+</html>

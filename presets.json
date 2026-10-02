@@ -1,0 +1,20 @@
+{
+  "keyfob": {
+    "start": 314.8,
+    "end": 315.2,
+    "step_khz": 10,
+    "dwell_ms": 40
+  },
+  "survey_915": {
+    "start": 902.0,
+    "end": 928.0,
+    "step_khz": 100,
+    "dwell_ms": 30
+  },
+  "survey_433": {
+    "start": 430.0,
+    "end": 437.0,
+    "step_khz": 50,
+    "dwell_ms": 30
+  }
+}

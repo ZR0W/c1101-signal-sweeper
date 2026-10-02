@@ -1,0 +1,11 @@
+# runtime data
+rfscan.db
+rfscan.db-wal
+rfscan.db-shm
+rfscan_export*.csv
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
